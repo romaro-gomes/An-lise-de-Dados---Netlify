@@ -1,0 +1,276 @@
+---
+title: "Kaggle: Bike Trips"
+author: "Romario"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: hide
+    css: style.css
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(
+   warning=FALSE, message=FALSE, tidy=TRUE,	tidy.opts=list(arrow=TRUE,	indent=2),fig.width = 6, fig.align = 'center', fig.asp=0.618, out.width = '100%')
+```
+# Introdução
+
+Serem acusados de fazerem mal ao [meio-ambiente](https://www.meucarronovo.com.br/blog/post/Conheca-quais-sao-os-impactos-do-automovel-no-meio-ambiente/) e terem um [aumento](https://inteligenciafinanceira.com.br/aprenda/poupar/custo-para-manter-o-carro-quase-dobra-em-sete-anos-avalie-se-e-hora-de-trocar-o-seu/), quase logarítmico, dos custos com impostos e manutenção, tornaram os carros cada vez mais impopulares.
+
+Em contrapartida, vem aumentando o uso de aplicativos de mobilidade, [individual](https://www.tecmundo.com.br/software/215160-conheca-aplicativos-transporte-parecidos-uber.htm) e [coletiva](https://canaltech.com.br/mercado/buser-wemobi-e-flixbus-a-disputa-dos-ubers-dos-onibus-engata-a-quinta-marcha-193512/). Tanto de automóveis, como de patinetes e bicicletas.
+
+Aqui no Rio, cidade onde moro, houve um [boom](http://www.revistaservioeste.com.br/noticias/o-boom-dos-patinetes-eletricos) dos patinetes, no mundo distante do final década e 10. Hoje,devido a motivos sanitários e políticos, talvez, [eles perderam força](https://summitmobilidade.estadao.com.br/guia-do-transporte-urbano/como-a-pandemia-afetou-o-mercado-de-patinetes-eletricos/)
+
+Outro meio de [locomoção alternativo](https://www.metlife.com.br/blog/saude-e-bem-estar/transportes-alternativos--mude-como-se-locomove-e-promova-o-bem-/), iniciado  antes dos patinetes e que ainda sobrevivem, são as bicicletas alugadas. Elas são fornecidas por um grande popular no país, não citarei [nomes](https://www.viciadaemviajar.com/aluguel-de-bicicletas-rio-de-janeiro/), pois não estou sendo patrocinado.
+
+Não sei os custos para alugá-las, pois não sei andar de bicicleta, mas é possível ver pessoas felizes as pedalando nas orlas da zona sul. Seja alguém que gosta de se exercitar ou um entregador de deliveries.
+
+A ideia é boa e parece lucrativa, ou pelo menos dá uma aura de sustentabilidade à empresa. Entretanto, não é original, o que não é um problema. Ao que parece, a [Citi Bike](https://citibikenyc.com/homepage) é um programa parecido de compartilhamento de bicicletas, presente na cidade de Nova Iorque desde de 2013.
+
+Olha, minha visão de Nova Iork é um pouco estereotipada, influência de [comédias românticas](https://www.adorocinema.com/filmes/filme-134107/) e gibis do [homem-aranha](https://www.hypeness.com.br/2018/10/este-mapa-detalha-qual-super-heroi-protege-qual-bairro-de-nova-york/), então não me parece ser uma cidade muito agradável e segura para andar de bicicleta.
+
+Mas se os nova-iorquinos se aventuram, quem sou eu para julgar. E é sobre eles que vamos aprender mais um pouco.
+
+
+# Cadê as fontes?
+
+Essa análise será feita a partir de um dataset disponível no [Kaggle](https://www.kaggle.com/), uma acervo de vários arquivos para treinar:
+  
+  - Análise de dados;
+  - Visualização de dados;
+  - Machine Learning;
+  - e muitas outras coisas.
+
+Além disso, ele possui cursos com certificados de introdução a linguagem python e ao principal pacote do mesmo para a área de dados, o pandas.
+
+Mas prefiro usar o R.
+
+Este é o clique aqui para o [`dataset`](https://www.kaggle.com/datasets/gabrielramos87/bike-trips/metadata), bora a a análise.
+
+
+# Bibliotecas
+
+```{r warning=FALSE, message=FALSE, class.source	=	'fold-show'}
+library(tidyverse) # Um conjunto de pacotes para manipular os dados
+library(janitor) # Mais pacote para ajudar a maniplular
+library(lubridate) # Mais um pacote... Focado em manipular o 'tempo'.
+library(knitr) #Fazer tabelas bonitinhas
+library(leaflet) # Mapas
+```
+
+# Uma primeira visão dos dados
+
+```{r include=FALSE}
+bike=read_csv('bike.csv')
+```
+Vamos descobrir qual o tamanho deste dataset, seu número de linhas e colunas.
+
+```{r}
+print(paste('Número de linhas:',dim(bike)[1],'|| Número de variavéis:',dim(bike)[2]))
+```
+
+O primeiro número é de linhas e o segundo e colunas. E bem temos muitas linhas.
+
+Devemos também visualizar se há células vazias, com linhas ou colunas com informaçães faltantes.
+
+```{r}
+print(paste('Número de informações faltando',sum(is.na(bike))))
+```
+Pelo santos guias do BI, esse dataset não possuí dados faltantes, obrigado [Biel](https://www.kaggle.com/gabrielramos87) :D
+
+Agora veremos as o nome de todas colunas
+
+```{r}
+paste0(colnames(bike))
+
+```
+Repare que há uma coluna determinada `bike_id`. No texto que acompanha o datase, eu havia entendido que era um id para8 *cada usuário* do aplicativo resolvi dar uma olhada.
+
+```{r}
+id= unique(bike$bike_id)
+bike %>% filter(bike_id == id[1]) %>% select(bike_id,age,gender) %>% head() %>% kable()
+```
+
+Em bancos de dados ou estruturas para análise de dados, os id identificam algo único. Se ele fossem uma representação de um único usuário em gênero e idade, não mudariam em menos de o mês. O que me faz suspeitar, que este id representa uma bicicleta especídica.
+
+No mundo real, numa realidade de dados, o ideal seria perguntar a quem faz o recolhimento desses dados, o que esse bike_id significa. Como não posso perguntar ao Biel, irei supor que dados sobre gênero e id, independem do bike_id. Essa suposição será importante para continuar a análise.
+
+Terminada esta parte, vamos ver sobre o tipo desses dados.
+
+```{r}
+glimpse(bike)
+```
+Nada a comentar.
+
+Vamos resumir esses dados?
+
+```{r}
+summary(bike)
+```
+HUm... Enganei-me. As colunas end_station_id, start_station_id e bike_id apesar de serem números, acredito que serem caracteres seja melhor, para evitar algum futuro erro.
+
+```{r}
+bike$end_station_id = as.character(bike$end_station_id)
+bike$start_station_id = as.character(bike$start_station_id)
+bike$bike_id = as.character(bike$bike_id)
+bike$gender= recode_factor(bike$gender,female='Feminino',male='Masculino')
+summary(bike)
+```
+Acho que assim está melhor
+
+
+# Vamos conhecer o público?
+
+Acho que a primeira pergunta é.... Quem usa essas bicicletas? Isso é importante para a empresa pensar em que como fazer campanhas, tanto para agradar seu publico mais fiel ou para atrair pessoas novas.
+
+Ou, em casos de verba para melhor o serviço, que tipo de público-alvo ou persona ela deve focar em agradar, para manter a fidelidade.
+
+Então a primeira pergunta é:
+
+## Qual o gênero mais usa o serviço?
+
+```{r}
+kable(
+  tabyl(bike$gender),
+  digits = 2,
+  col.names =c('Gênero','Quantidade','Porcentagem'),align = c('l','c','r')
+       )
+
+```
+
+Claramente, pessoas do gênero masculino são as que mais usam o produto.
+
+## Qual idade?
+
+Precisamos categorizar a idade, para tornar mais fácil a visualização e entendiento
+```{r}
+categoria=cut(bike$age,
+              breaks=c(0,20,30,40,50,60,70,80,Inf),
+              labels=c('0-19','20-29','30-39','40-49','50-59',                                                     '60-69','70-79','acima de 80'),
+              include.lowest =F )
+
+bike2= bike %>% mutate( faixa=categoria)
+
+kable(
+  tabyl(bike2$faixa),
+  digits = 2,
+  col.names =c('Faixa Etária','Quantidade','Porcentagem'),align = c('l','c','r')
+       )
+```
+
+O maior público das bicicletas está está  na faxa dos 20 à 39 anos, mas da metade dos usuários.
+
+# Visualizações
+
+Esses dados são do mês de Maio de 2018, não sei se esse mês é possuí alguma data especial em Nova Iorque, mas será que ele pode dar informação não só sobre o marketing, mas também sobre a logística?
+
+## Quais dias da semana tem mais usuário?
+
+```{r}
+bike2= bike2 %>% mutate(d_sem= lubridate::wday(start_time, label = T),dia=lubridate::day(start_time))
+
+bike2 %>% 
+    group_by(d_sem,dia) %>%
+    summarise( n=n())%>%
+    ggplot() +
+    geom_boxplot(aes(x=d_sem, y=n, fill=d_sem))+
+    scale_y_continuous(breaks = seq(from = 20000, to = 100000, by = 10000)) +
+    scale_fill_brewer(palette = "Dark2") +
+    labs(x='Dias da Semana', y="Número de Acessos") +
+    theme(legend.position="none") 
+```
+
+Pelo menos em Maio, quarta-feira foi o dia mais usado. Colocaria mais bicicletas na rua nestes dias.
+
+# O que mais podemos saber sobre os usuários?
+
+Independente do genêro, quarta-feira é o dia mais usado
+
+```{r}
+bike2 %>% 
+  group_by(d_sem,dia,gender) %>%
+  summarise( n=n()) %>%
+  ggplot() +
+  geom_boxplot(aes(x=d_sem, y=n, fill=d_sem)) +
+  facet_wrap(~gender) +
+  scale_y_continuous(breaks = seq(from = 0, to = 60000, by =5000 )) +
+  scale_fill_brewer(palette = "Dark2")+
+  labs(x='Dias da Semana', y="Número de Acessos") +
+  theme(legend.position="none") 
+```
+
+
+
+Independente da faixa etária, os homens foram os que mais usaram o serviço
+```{r}
+bike2 %>% group_by(faixa,gender) %>% summarise(n=n()) %>%
+          ggplot() + 
+          geom_col(aes(x=gender, y=n,fill=gender)) +
+          facet_wrap(~faixa) +
+          scale_y_continuous(breaks = seq(from = 100000, to = 500000, by =50000 ))  +
+          labs(x='Gênero', y="Número de Acessos") +
+          theme(legend.position="none") 
+```
+
+`Asssinantes`(*Subscriber*) além de utilizarem as bicicletas mais vezes que `clientes avulsos`(*Customer*), também utilizam mais nas quartas-feiras. 
+```{r}
+bike2  %>% 
+  group_by(d_sem,dia,user_type) %>%
+  summarise( n=n())%>%
+  ggplot() +
+  geom_boxplot(aes(x=d_sem, y=n, fill=d_sem)) +
+  facet_wrap(~user_type) +
+  scale_y_continuous(breaks = seq(from = 0, to = 70000, by = 10000)) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x='Dias da Semana', y="Número de Acessos") +
+  theme(legend.position="none") 
+  
+```
+
+Curiosidade: Quando sou responsavél técnico em alguma drogaria (Sou farmacêutico de formação), é nítido a importância de um clinte fiel, que prefere consumir em sua drograria. Entretanto, este dataset deixa bem claro a diferença e como isso impacta os negocios e este [artigo](https://www.cratejoy.com/sell/blog/difference-between-subscriber-and-customer/) facilita o entendimento.
+
+# As Estações.
+
+Agora iremos avaliar quais são as estações que mais tiveram acesso dos usuário em todo mês de Maio.
+
+```{r}
+dez=bike2 %>% group_by(start_station_name,start_station_id) %>% summarise(N=n())  %>%  arrange(desc(N)) %>% head(10)
+
+dez %>% ggplot(aes(x=reorder(start_station_name, -N), y= N, fill=start_station_name)) + geom_col() + 
+  coord_flip() + theme(legend.position="none") + 
+  labs ( y = 'Número de acessos', x="Estações", title = " As Dez Estações Mais Usadas") 
+
+```
+
+
+## Qual a mais estação mais  utilizada na quarta?
+
+```{r}
+dez = bike2 %>% filter(d_sem == 'qua') %>% group_by(start_station_name,start_station_id) %>% summarise(N=n())  %>%  arrange(desc(N)) %>% head(10)
+
+dez %>% ggplot(aes(x=reorder(start_station_name, -N), y= N, fill=start_station_name)) + geom_col() + 
+  coord_flip() + theme(legend.position="none") + 
+  labs ( y = 'Número de acessos', x="Estações", title = " As Dez Estações Mais Usadas nas Quartas")
+```
+
+## Há variação pelo tipo de usuário?
+
+```{r fig.width= 7}
+sub = bike2 %>% group_by(start_station_name,user_type) %>% summarise(N=n())  %>%  arrange(desc(N)) %>% filter(user_type == 'Subscriber') %>% head(10)
+customer = bike2 %>% group_by(start_station_name,user_type) %>% summarise(N=n()) %>%  arrange(desc(N)) %>% filter(user_type == 'Customer') %>% head(10)
+
+sub %>% ggplot(aes(x=reorder(start_station_name, -N), y= N, fill=start_station_name)) + geom_col() + 
+  coord_flip() + theme(legend.position="none") + 
+  labs ( y = 'Número de acessos', x="Estações", title = " As Dez Estações Mais Usadas pelos Subscribers")
+
+customer %>% ggplot(aes(x=reorder(start_station_name, -N), y= N, fill=start_station_name)) + geom_col() + 
+  coord_flip() + theme(legend.position="none") + 
+  labs ( y = 'Número de acessos', x="Estações", title = " As Dez Estações Mais Usadas pelos Costumers")
+  
+```
+Vemos por essa última comparação que os consumidores avulsos tem utilizam estaçãos diferentes que os assinantes. Considerano que a mais uada pelos avulsos foi a do Central Park, eu imagino que sejá para passear por ele, apenas um achismos.
+
+De quaquer forma, talvez seja valiada uma investigação mais profunda. E a partir do resultado, isto pode ser utilizado pelo marketing para alocação de propagrandas nestas estações, específicas para angariar mais inscrições ao programa.
+
+# Conclusão
+
+Tivemos uma visão geral qual é o perfil e consumidores dos usuários de biclicletas alugadas em Nova Iorque e possiveis insights que podem ajudar a equipe de negocios a tomar decisões melhores.
